@@ -15,6 +15,7 @@ requires-python = ">=3.10"
 dependencies = [
     "markdown>=3.8.2",
     "nbconvert>=7.16.6",
+    "pathspec>=0.12.1",
     "pygments>=2.19.2",
 ]
 classifiers = [

@@ -115,12 +115,26 @@ def decide_file(path: pathlib.Path, repo_root: pathlib.Path, max_bytes: int) -> 
     return FileInfo(path, rel, size, RenderDecision(True, "ok"))
 
 
-def collect_files(repo_root: pathlib.Path, max_bytes: int) -> List[FileInfo]:
+def collect_files(repo_root: pathlib.Path, max_bytes: int, use_gitignore: bool = False) -> List[FileInfo]:
     infos: List[FileInfo] = []
+    spec = None
+    if use_gitignore:
+        try:
+            import pathspec
+        except ImportError:
+            print("ERROR: pathspec package is required for .gitignore support. Install with 'pip install pathspec'", file=sys.stderr)
+            sys.exit(1)
+        gitignore_path = repo_root / ".gitignore"
+        if gitignore_path.exists():
+            with gitignore_path.open("r") as f:
+                spec = pathspec.PathSpec.from_lines("gitwildmatch", f)
     for p in sorted(repo_root.rglob("*")):
         if p.is_symlink():
             continue
         if p.is_file():
+            rel = str(p.relative_to(repo_root)).replace(os.sep, "/")
+            if use_gitignore and spec and spec.match_file(rel):
+                continue
             infos.append(decide_file(p, repo_root, max_bytes))
     return infos
 
@@ -513,7 +527,7 @@ def main() -> int:
         print(f"✓ Clone complete (HEAD: {head[:8]})", file=sys.stderr)
 
     print(f"📊 Scanning files in {repo_dir}...", file=sys.stderr)
-    infos = collect_files(repo_dir, args.max_bytes)
+    infos = collect_files(repo_dir, args.max_bytes, use_gitignore=is_local)
     rendered_count = sum(1 for i in infos if i.decision.include)
     skipped_count = len(infos) - rendered_count
     print(f"✓ Found {len(infos)} files total ({rendered_count} will be rendered, {skipped_count} skipped)", file=sys.stderr)
