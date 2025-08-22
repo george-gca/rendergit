@@ -21,6 +21,9 @@ from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_for_filename, TextLexer
 import markdown
+import json
+import nbconvert
+from nbconvert import HTMLExporter
 
 MAX_DEFAULT_BYTES = 50 * 1024
 BINARY_EXTENSIONS = {
@@ -31,6 +34,7 @@ BINARY_EXTENSIONS = {
     ".so", ".dll", ".dylib", ".class", ".jar", ".exe", ".bin",
 }
 MARKDOWN_EXTENSIONS = {".md", ".markdown", ".mdown", ".mkd", ".mkdn"}
+NOTEBOOK_EXTENSIONS = {".ipynb"}
 
 @dataclass
 class RenderDecision:
@@ -153,6 +157,17 @@ def try_tree_command(root: pathlib.Path) -> str:
 def read_text(path: pathlib.Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
+def render_notebook_html(nb_path: pathlib.Path) -> str:
+    """Convert a Jupyter notebook to HTML using nbconvert."""
+    try:
+        exporter = HTMLExporter()
+        exporter.exclude_input_prompt = True
+        exporter.exclude_output_prompt = True
+        body, _ = exporter.from_filename(str(nb_path))
+        return body
+    except Exception as e:
+        return f"<pre class='error'>Failed to render notebook: {html.escape(str(e))}</pre>"
+
 
 def render_markdown_text(md_text: str) -> str:
     return markdown.markdown(md_text, extensions=["fenced_code", "tables", "toc"])  # type: ignore
@@ -234,21 +249,18 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: L
         p = i.path
         ext = p.suffix.lower()
         try:
-            text = read_text(p)
-            if ext in MARKDOWN_EXTENSIONS:
-                body_html = render_markdown_text(text)
+            if ext in NOTEBOOK_EXTENSIONS:
+                body_html = render_notebook_html(p)
             else:
-                code_html = highlight_code(text, i.rel, formatter)
-                body_html = f'<div class="highlight">{code_html}</div>'
+                text = read_text(p)
+                if ext in MARKDOWN_EXTENSIONS:
+                    body_html = render_markdown_text(text)
+                else:
+                    code_html = highlight_code(text, i.rel, formatter)
+                    body_html = f'<div class="highlight">{code_html}</div>'
         except Exception as e:
             body_html = f'<pre class="error">Failed to render: {html.escape(str(e))}</pre>'
-        sections.append(f"""
-<section class="file-section" id="file-{anchor}">
-  <h2>{html.escape(i.rel)} <span class="muted">({bytes_human(i.size)})</span></h2>
-  <div class="file-body">{body_html}</div>
-  <div class="back-top"><a href="#top">↑ Back to top</a></div>
-</section>
-""")
+        sections.append(f'<section class="file-section" id="file-{anchor}">\n  <h2>{html.escape(i.rel)} <span class="muted">({bytes_human(i.size)})</span></h2>\n  <div class="file-body">{body_html}</div>\n  <div class="back-top"><a href="#top">↑ Back to top</a></div>\n</section>\n')
 
     # Skips lists
     def render_skip_list(title: str, items: List[FileInfo]) -> str:
