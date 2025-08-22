@@ -483,49 +483,59 @@ def derive_temp_output_path(repo_url: str) -> pathlib.Path:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Flatten a GitHub repo to a single HTML page")
-    ap.add_argument("repo_url", help="GitHub repo URL (https://github.com/owner/repo[.git])")
+    ap = argparse.ArgumentParser(description="Flatten a GitHub or local repo to a single HTML page")
+    ap.add_argument("repo_path_or_url", help="GitHub repo URL (https://github.com/owner/repo[.git]) or local path")
     ap.add_argument("-o", "--out", help="Output HTML file path (default: temporary file derived from repo name)")
     ap.add_argument("--max-bytes", type=int, default=MAX_DEFAULT_BYTES, help="Max file size to render (bytes); larger files are listed but skipped")
     ap.add_argument("--no-open", action="store_true", help="Don't open the HTML file in browser after generation")
     args = ap.parse_args()
 
-    # Set default output path if not provided
+    # Determine if input is a local path or remote URL
+    input_path = args.repo_path_or_url
+    is_local = os.path.exists(input_path)
+
     if args.out is None:
-        args.out = str(derive_temp_output_path(args.repo_url))
+        args.out = str(derive_temp_output_path(input_path))
 
-    tmpdir = tempfile.mkdtemp(prefix="flatten_repo_")
-    repo_dir = pathlib.Path(tmpdir, "repo")
-
-    try:
-        print(f"📁 Cloning {args.repo_url} to temporary directory: {repo_dir}", file=sys.stderr)
-        git_clone(args.repo_url, str(repo_dir))
+    tmpdir = None
+    if is_local:
+        repo_dir = pathlib.Path(input_path).resolve()
+        repo_url = str(repo_dir)
+        head = git_head_commit(str(repo_dir))
+        print(f"📁 Using local repo: {repo_dir}", file=sys.stderr)
+    else:
+        tmpdir = tempfile.mkdtemp(prefix="flatten_repo_")
+        repo_dir = pathlib.Path(tmpdir, "repo")
+        repo_url = input_path
+        print(f"📁 Cloning {input_path} to temporary directory: {repo_dir}", file=sys.stderr)
+        git_clone(input_path, str(repo_dir))
         head = git_head_commit(str(repo_dir))
         print(f"✓ Clone complete (HEAD: {head[:8]})", file=sys.stderr)
 
-        print(f"📊 Scanning files in {repo_dir}...", file=sys.stderr)
-        infos = collect_files(repo_dir, args.max_bytes)
-        rendered_count = sum(1 for i in infos if i.decision.include)
-        skipped_count = len(infos) - rendered_count
-        print(f"✓ Found {len(infos)} files total ({rendered_count} will be rendered, {skipped_count} skipped)", file=sys.stderr)
+    print(f"📊 Scanning files in {repo_dir}...", file=sys.stderr)
+    infos = collect_files(repo_dir, args.max_bytes)
+    rendered_count = sum(1 for i in infos if i.decision.include)
+    skipped_count = len(infos) - rendered_count
+    print(f"✓ Found {len(infos)} files total ({rendered_count} will be rendered, {skipped_count} skipped)", file=sys.stderr)
 
-        print(f"🔨 Generating HTML...", file=sys.stderr)
-        html_out = build_html(args.repo_url, repo_dir, head, infos)
+    print("🔨 Generating HTML...", file=sys.stderr)
+    html_out = build_html(str(repo_url), repo_dir, head, infos)
 
-        out_path = pathlib.Path(args.out)
-        print(f"💾 Writing HTML file: {out_path.resolve()}", file=sys.stderr)
-        out_path.write_text(html_out, encoding="utf-8")
-        file_size = out_path.stat().st_size
-        print(f"✓ Wrote {bytes_human(file_size)} to {out_path}", file=sys.stderr)
+    out_path = pathlib.Path(args.out)
+    print(f"💾 Writing HTML file: {out_path.resolve()}", file=sys.stderr)
+    out_path.write_text(html_out, encoding="utf-8")
+    file_size = out_path.stat().st_size
+    print(f"✓ Wrote {bytes_human(file_size)} to {out_path}", file=sys.stderr)
 
-        if not args.no_open:
-            print(f"🌐 Opening {out_path} in browser...", file=sys.stderr)
-            webbrowser.open(f"file://{out_path.resolve()}")
+    if not args.no_open:
+        print(f"🌐 Opening {out_path} in browser...", file=sys.stderr)
+        webbrowser.open(f"file://{out_path.resolve()}")
 
+    # Clean up temp dir if cloned
+    if tmpdir is not None:
         print(f"🗑️  Cleaning up temporary directory: {tmpdir}", file=sys.stderr)
-        return 0
-    finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
+    return 0
 
 
 if __name__ == "__main__":
