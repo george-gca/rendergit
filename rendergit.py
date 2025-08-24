@@ -245,7 +245,7 @@ def render_notebook_html(nb_path: Path) -> str:
     try:
         # Create a Config object to set exporter options
         c = Config()
-        # c.HTMLExporter.theme = "dark"
+        c.HTMLExporter.theme = "dark"
         exporter = HTMLExporter(config=c)
         exporter.exclude_input_prompt = True
         exporter.exclude_output_prompt = True
@@ -366,7 +366,7 @@ def generate_advanced_stats(infos: list[FileInfo]) -> str:
     # Generate HTML
     stats_html = f"""
     <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin: 1.5rem 0;">
-      <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 1.5rem; border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+  <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: var(--text-primary); padding: 1.5rem; border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">📊 Size Analysis</h3>
         <div>Total Size: <strong>{bytes_human(total_size)}</strong></div>
         <div>Average File Size: <strong>{bytes_human(int(avg_size))}</strong></div>
@@ -375,7 +375,7 @@ def generate_advanced_stats(infos: list[FileInfo]) -> str:
     }</strong></div>
       </div>
 
-      <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+  <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: var(--text-primary); padding: 1.5rem; border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">🗂️ Directory Structure</h3>
         <div>Max Depth: <strong>{
         max(depth_stats.keys(), default=0)
@@ -388,7 +388,7 @@ def generate_advanced_stats(infos: list[FileInfo]) -> str:
     </div>
 
     <div class="stats-charts" style="margin: 1.5rem 0;">
-      <div style="background: white; padding: 2rem; border-radius: var(--radius-lg); box-shadow: var(--shadow-md); margin-bottom: 1.5rem;">
+  <div style="background: var(--bg-secondary); padding: 2rem; border-radius: var(--radius-lg); box-shadow: var(--shadow-md); margin-bottom: 1.5rem; color: var(--text-primary);">
         <h3 style="margin: 0 0 1rem 0;">🔤 Languages & File Types</h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
           {
@@ -409,7 +409,7 @@ def generate_advanced_stats(infos: list[FileInfo]) -> str:
         </div>
       </div>
 
-      <div style="background: white; padding: 2rem; border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+  <div style="background: var(--bg-secondary); padding: 2rem; border-radius: var(--radius-lg); box-shadow: var(--shadow-md); color: var(--text-primary);">
         <h3 style="margin: 0 0 1rem 0;">📂 Top File Extensions</h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem;">
           {
@@ -435,7 +435,7 @@ def add_export_features() -> str:
     """Add export functionality."""
     return """
     <!-- Export Controls -->
-    <div class="export-controls" style="margin: 1rem 0; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+  <div class="export-controls" style="margin: 1rem 0; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-light); box-shadow: var(--shadow-md);">
       <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">📤 Export & Share</h3>
       <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
         <button onclick="exportToPDF()" class="export-btn">📄 Export PDF</button>
@@ -460,10 +460,9 @@ def add_interactive_features() -> str:
       const searchHTML = `
         <div class="search-container" style="margin-bottom: 1.5rem;">
           <div class="search-box">
-            <input type="text" id="file-search" placeholder="🔍 Search files..."
-                   style="width: 100%; padding: 0.75rem 1rem; border: 2px solid var(--border-light);
-                          border-radius: var(--radius-md); font-size: 0.9rem; background: white;
-                          transition: all 0.2s ease;">
+       <input type="text" id="file-search" placeholder="🔍 Search files..."
+         style="width: 100%; padding: 0.75rem 1rem; border: 2px solid var(--border-light);
+           border-radius: var(--radius-md); font-size: 0.9rem; background: var(--bg-input); color: var(--text-primary); transition: all 0.2s ease;">
             <div id="search-results" style="margin-top: 0.5rem; display: none;"></div>
           </div>
           <div class="search-stats" style="font-size: 0.8rem; color: var(--text-tertiary);
@@ -563,9 +562,9 @@ def add_interactive_features() -> str:
         const lineNumbersEl = document.createElement('div');
         lineNumbersEl.style.cssText = `
           position: absolute; left: 0; top: 0; bottom: 0; width: 3rem;
-          background: rgba(0,0,0,0.1); border-right: 1px solid rgba(255,255,255,0.1);
+          background: var(--bg-tertiary); border-right: 1px solid var(--border-light);
           font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
-          color: rgba(255,255,255,0.5); text-align: right; padding: 1.5rem 0.5rem;
+          color: var(--text-tertiary); text-align: right; padding: 1.5rem 0.5rem;
           line-height: 1.5; user-select: none; white-space: pre;
         `;
         lineNumbersEl.textContent = lineNumbers;
@@ -643,11 +642,11 @@ def add_interactive_features() -> str:
         display: flex; align-items: center; justify-content: center; z-index: 10000;
       `;
       modal.innerHTML = `
-        <div style="background: white; padding: 2rem; border-radius: var(--radius-lg); text-align: center;">
+  <div style="background: var(--bg-secondary); padding: 2rem; border-radius: var(--radius-lg); text-align: center; box-shadow: var(--shadow-lg); color: var(--text-primary);">
           <h3>📱 QR Code for this page</h3>
           <img src="${qrUrl}" alt="QR Code" style="margin: 1rem 0;"/>
           <br><button onclick="this.parentElement.parentElement.remove()"
-                     style="padding: 0.5rem 1rem; background: var(--primary-gradient); color: white; border: none; border-radius: var(--radius-sm);">Close</button>
+                     style="padding: 0.5rem 1rem; background: var(--primary-gradient); color: var(--text-primary); border: none; border-radius: var(--radius-sm);">Close</button>
         </div>
       `;
       document.body.appendChild(modal);
@@ -658,7 +657,7 @@ def add_interactive_features() -> str:
       toast.textContent = message;
       toast.style.cssText = `
         position: fixed; top: 2rem; right: 2rem; background: var(--success-gradient);
-        color: white; padding: 1rem 1.5rem; border-radius: var(--radius-md);
+        color: var(--text-primary); padding: 1rem 1.5rem; border-radius: var(--radius-md);
         box-shadow: var(--shadow-lg); z-index: 10000; animation: slideIn 0.3s ease;
       `;
       document.body.appendChild(toast);
@@ -971,6 +970,7 @@ def build_html(
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta name="color-scheme" content="dark" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Flattened repo - {html.escape(repo_url)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -978,26 +978,21 @@ def build_html(
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {{
-    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    --danger-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    --bg-primary: #181a1b;
+    --bg-secondary: #232629;
+    --bg-tertiary: #1b1f23;
+    --bg-code: #181a1b;
+    --bg-sidebar: #232629;
 
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8fafc;
-    --bg-tertiary: #f1f5f9;
-    --bg-code: #0f172a;
-    --bg-sidebar: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
-
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-tertiary: #94a3b8;
-    --text-accent: #3b82f6;
+    --text-primary: #c9d1d9;
+    --text-secondary: #7a8288;
+    --text-tertiary: #7a8288;
+    --text-accent: #79b8ff;
     --text-code: #e2e8f0;
 
-    --border-light: #e2e8f0;
-    --border-medium: #cbd5e1;
-    --border-strong: #94a3b8;
+    --border-light: #22272e;
+    --border-medium: #22272e;
+    --border-strong: #22272e;
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -1147,13 +1142,16 @@ def build_html(
 
   .toc-directory {{
     margin-bottom: 0.1rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    padding: 0.25rem 0.75rem;
   }}
 
   .toc-directory .directory-name {{
     display: block;
     padding: 0.4rem 0.75rem;
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: 600;The background of the
     font-size: 0.8rem;
     white-space: pre;
     cursor: default;
@@ -1282,25 +1280,25 @@ def build_html(
   }}
 
   .meta a {{
-    color: rgba(255, 255, 255, 0.9);
+  color: var(--text-accent);
     text-decoration: none;
-    border-bottom: 1px dotted rgba(255, 255, 255, 0.5);
+  border-bottom: 1px dotted var(--accent);
     transition: all 0.2s ease;
   }}
 
   .meta a:hover {{
-    color: white;
-    border-bottom-color: white;
+  color: var(--accent);
+  border-bottom-color: var(--accent);
   }}
 
   .counts {{
     margin-top: 1rem;
     font-size: 0.95rem;
-    background: rgba(255, 255, 255, 0.1);
+  background: rgba(121, 184, 255, 0.08); /* accent color, subtle for dark theme */
     backdrop-filter: blur(10px);
     padding: 1rem 1.5rem;
     border-radius: var(--radius-md);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--border-light);
   }}
 
   /* View toggle with enhanced styling */
@@ -1367,7 +1365,7 @@ def build_html(
 
   /* Enhanced sections */
   .content-section {{
-    background: white;
+    background: var(--bg-secondary);
     margin: 2rem 0;
     padding: 2rem;
     border-radius: var(--radius-lg);
@@ -1443,7 +1441,7 @@ def build_html(
 
   /* File sections with enhanced styling */
   .file-section {{
-    background: white;
+    background: var(--bg-secondary);
     margin: 1.5rem 0;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
@@ -1503,6 +1501,7 @@ def build_html(
 
   .file-body {{
     padding: 2rem;
+    background: var(--bg-secondary);
   }}
 
   .back-top {{
@@ -1548,14 +1547,15 @@ def build_html(
   .skip-list li {{
     padding: 0.75rem 1rem;
     margin: 0.5rem 0;
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
     border-radius: var(--radius-sm);
     border-left: 4px solid var(--danger-gradient);
     transition: all 0.2s ease;
   }}
 
   .skip-list li:hover {{
-    background: white;
+    background: var(--bg-tertiary);
     transform: translateX(4px);
     box-shadow: var(--shadow-sm);
   }}
@@ -1818,6 +1818,7 @@ def build_html(
 
     .file-body {{
       padding: 1.5rem;
+      background: var(--bg-secondary);
     }}
 
     .back-top {{
@@ -1894,6 +1895,7 @@ def build_html(
 
     .file-body {{
       padding: 1rem;
+      background: var(--bg-secondary);
     }}
 
     .back-top {{
@@ -2049,6 +2051,21 @@ def build_html(
     background: var(--primary-gradient);
     margin: 2rem 0;
     border-radius: 1px;
+  }}
+
+  .toc-directory {{
+    margin-bottom: 0.1rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    padding: 0.25rem 0.75rem;
+  }}
+
+  .breadcrumb {{
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 1rem;
+    margin-bottom: 0.5rem;
   }}
 </style>
 </head>
