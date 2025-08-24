@@ -17,13 +17,17 @@ from dataclasses import dataclass
 from typing import List
 
 # External deps
+from nbconvert import HTMLExporter
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_for_filename, TextLexer
-import markdown
-import json
-import nbconvert
-from nbconvert import HTMLExporter
+from traitlets.config import Config
+
+try:
+    import markdown  # Python-Markdown
+except ImportError as e:
+    print("Missing dependency: markdown. Install with `pip install markdown`.", file=sys.stderr)
+    raise
 
 MAX_DEFAULT_BYTES = 50 * 1024
 BINARY_EXTENSIONS = {
@@ -50,14 +54,17 @@ class FileInfo:
 
 
 def run(cmd: List[str], cwd: str | None = None, check: bool = True) -> subprocess.CompletedProcess:
+    # Helper to run shell commands and capture output
     return subprocess.run(cmd, cwd=cwd, check=check, text=True, capture_output=True)
 
 
 def git_clone(url: str, dst: str) -> None:
+    # Clones the repository to a destination folder
     run(["git", "clone", "--depth", "1", url, dst])
 
 
 def git_head_commit(repo_dir: str) -> str:
+    # Grabs the HEAD commit hash for display
     try:
         cp = run(["git", "rev-parse", "HEAD"], cwd=repo_dir)
         return cp.stdout.strip()
@@ -80,6 +87,7 @@ def bytes_human(n: int) -> str:
 
 
 def looks_binary(path: pathlib.Path) -> bool:
+    # Heuristic: decide if a file is binary by extension, null bytes, or decode failure
     ext = path.suffix.lower()
     if ext in BINARY_EXTENSIONS:
         return True
@@ -100,6 +108,7 @@ def looks_binary(path: pathlib.Path) -> bool:
 
 
 def decide_file(path: pathlib.Path, repo_root: pathlib.Path, max_bytes: int) -> FileInfo:
+    # Decide whether to include a file, and record why if not
     rel = str(path.relative_to(repo_root)).replace(os.sep, "/")
     try:
         size = path.stat().st_size
@@ -116,6 +125,7 @@ def decide_file(path: pathlib.Path, repo_root: pathlib.Path, max_bytes: int) -> 
 
 
 def collect_files(repo_root: pathlib.Path, max_bytes: int, use_gitignore: bool = False) -> List[FileInfo]:
+    # Walk the repo and collect candidate files with decisions
     infos: List[FileInfo] = []
     spec = None
     if use_gitignore:
@@ -161,6 +171,7 @@ def generate_tree_fallback(root: pathlib.Path) -> str:
 
 
 def try_tree_command(root: pathlib.Path) -> str:
+    # Use the real `tree` output if available; otherwise fall back to our Python version
     try:
         cp = run(["tree", "-a", "."], cwd=str(root))
         return cp.stdout
@@ -169,12 +180,16 @@ def try_tree_command(root: pathlib.Path) -> str:
 
 
 def read_text(path: pathlib.Path) -> str:
+    # Read text safely with UTF-8 and replacement for weird bytes
     return path.read_text(encoding="utf-8", errors="replace")
 
 def render_notebook_html(nb_path: pathlib.Path) -> str:
     """Convert a Jupyter notebook to HTML using nbconvert."""
     try:
-        exporter = HTMLExporter()
+        # Create a Config object to set exporter options
+        c = Config()
+        c.HTMLExporter.theme = 'dark'
+        exporter = HTMLExporter(config=c)
         exporter.exclude_input_prompt = True
         exporter.exclude_output_prompt = True
         body, _ = exporter.from_filename(str(nb_path))
@@ -184,10 +199,12 @@ def render_notebook_html(nb_path: pathlib.Path) -> str:
 
 
 def render_markdown_text(md_text: str) -> str:
+    # Convert Markdown into HTML with common extensions
     return markdown.markdown(md_text, extensions=["fenced_code", "tables", "toc"])  # type: ignore
 
 
 def highlight_code(text: str, filename: str, formatter: HtmlFormatter) -> str:
+    # Syntax-highlight code using Pygments
     try:
         lexer = get_lexer_for_filename(filename, stripall=False)
     except Exception:
@@ -230,10 +247,11 @@ def generate_cxml_text(infos: List[FileInfo], repo_dir: pathlib.Path) -> str:
 
 
 def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: List[FileInfo]) -> str:
-    formatter = HtmlFormatter(nowrap=False)
+    # Use a dark Pygments theme to match the page (monokai is widely available)
+    formatter = HtmlFormatter(nowrap=False, style="monokai")  # <-- dark theme for code
     pygments_css = formatter.get_style_defs('.highlight')
 
-    # Stats
+    # Stats for the header
     rendered = [i for i in infos if i.decision.include]
     skipped_binary = [i for i in infos if i.decision.reason == "binary"]
     skipped_large = [i for i in infos if i.decision.reason == "too_large"]
@@ -302,43 +320,73 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: L
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Tell browsers our UI is dark so scrollbars/inputs match -->
+<meta name="color-scheme" content="dark" />
 <title>Flattened repo – {html.escape(repo_url)}</title>
 <style>
+  /* =======================
+     Dark Theme Tokens
+     (one place to tweak)
+     ======================= */
+  :root {{
+    --bg: #0d1117;           /* page background */
+    --panel: #0f141b;        /* cards/panels background */
+    --text: #e6edf3;         /* primary text */
+    --muted: #9aa7b3;        /* secondary text */
+    --border: #30363d;       /* subtle borders */
+    --accent: #58a6ff;       /* link / accent */
+    --accent-hover: #79c0ff; /* link hover */
+    --code-bg: #161b22;      /* code blocks, pre, sidebar */
+  }}
+
+  /* ===== Base layout & typography (dark) ===== */
   body {{
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji','Segoe UI Emoji';
-    margin: 0; padding: 0; line-height: 1.45;
+    margin: 0; padding: 0; line-height: 1.5;
+    background: var(--bg);           /* dark background */
+    color: var(--text);              /* readable light text */
   }}
   .container {{ max-width: 1100px; margin: 0 auto; padding: 0 1rem; }}
-  .meta small {{ color: #666; }}
-  .counts {{ margin-top: 0.25rem; color: #333; }}
-  .muted {{ color: #777; font-weight: normal; font-size: 0.9em; }}
+  .meta small {{ color: var(--muted); }}
+  .counts {{ margin-top: 0.25rem; color: var(--muted); }}
+  .muted {{ color: var(--muted); font-weight: normal; font-size: 0.9em; }}
 
   /* Layout with sidebar */
   .page {{ display: grid; grid-template-columns: 320px minmax(0,1fr); gap: 0; }}
   #sidebar {{
     position: sticky; top: 0; align-self: start;
     height: 100vh; overflow: auto;
-    border-right: 1px solid #eee; background: #fafbfc;
+    border-right: 1px solid var(--border);
+    background: var(--code-bg);      /* darker panel for sidebar */
   }}
   #sidebar .sidebar-inner {{ padding: 0.75rem; }}
-  #sidebar h2 {{ margin: 0 0 0.5rem 0; font-size: 1rem; }}
+  #sidebar h2 {{ margin: 0 0 0.5rem 0; font-size: 1rem; color: var(--text); }}
 
   .toc {{ list-style: none; padding-left: 0; margin: 0; overflow-x: auto; }}
   .toc li {{ padding: 0.15rem 0; white-space: nowrap; }}
-  .toc a {{ text-decoration: none; color: #0366d6; display: inline-block; text-decoration: none; }}
-  .toc a:hover {{ text-decoration: underline; }}
+  .toc a {{ text-decoration: none; color: var(--accent); display: inline-block; }}
+  .toc a:hover {{ text-decoration: underline; color: var(--accent-hover); }}
 
   main.container {{ padding-top: 1rem; }}
 
-  pre {{ background: #f6f8fa; padding: 0.75rem; overflow: auto; border-radius: 6px; }}
+  /* ===== Code & pre blocks fit the dark theme ===== */
+  pre {{
+    background: var(--code-bg);
+    padding: 0.75rem; overflow: auto; border-radius: 6px;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }}
   code {{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono','Courier New', monospace; }}
-  .highlight {{ overflow-x: auto; }}
-  .file-section {{ padding: 1rem; border-top: 1px solid #eee; }}
-  .file-section h2 {{ margin: 0 0 0.5rem 0; font-size: 1.1rem; }}
+
+  .highlight {{ overflow-x: auto; background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; }}
+  .file-section {{ padding: 1rem; border-top: 1px solid var(--border); background: transparent; }}
+  .file-section h2 {{ margin: 0 0 0.5rem 0; font-size: 1.1rem; color: var(--text); }}
   .file-body {{ margin-bottom: 0.5rem; }}
-  .back-top {{ font-size: 0.9rem; }}
-  .skip-list code {{ background: #f6f8fa; padding: 0.1rem 0.3rem; border-radius: 4px; }}
-  .error {{ color: #b00020; background: #fff3f3; }}
+  .back-top a {{ color: var(--accent); }}
+  .back-top a:hover {{ color: var(--accent-hover); }}
+
+  .skip-list code {{ background: var(--code-bg); padding: 0.1rem 0.3rem; border-radius: 4px; border: 1px solid var(--border); color: var(--text); }}
+  .error {{ color: #ffb4b4; background: #2a0f12; border: 1px solid #5a1a1a; padding: 0.5rem; border-radius: 6px; }}
 
   /* Hide duplicate top TOC on wide screens */
   .toc-top {{ display: block; }}
@@ -355,19 +403,20 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: L
   }}
   .toggle-btn {{
     padding: 0.5rem 1rem;
-    border: 1px solid #d1d9e0;
-    background: white;
+    border: 1px solid var(--border);
+    background: var(--panel);
     cursor: pointer;
     border-radius: 6px;
     font-size: 0.9rem;
+    color: var(--text);
   }}
   .toggle-btn.active {{
-    background: #0366d6;
-    color: white;
-    border-color: #0366d6;
+    background: var(--accent);
+    color: #0b1020;
+    border-color: var(--accent);
   }}
   .toggle-btn:hover:not(.active) {{
-    background: #f6f8fa;
+    background: #0e1520;
   }}
 
   /* LLM view */
@@ -377,19 +426,25 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: L
     height: 70vh;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.85em;
-    border: 1px solid #d1d9e0;
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 1rem;
     resize: vertical;
+    background: var(--code-bg);
+    color: var(--text);
   }}
   .copy-hint {{
     margin-top: 0.5rem;
-    color: #666;
+    color: var(--muted);
     font-size: 0.9em;
   }}
 
-  /* Pygments */
+  /* Pygments (monokai)
+     We include Pygments CSS and then override backgrounds to our --code-bg
+     so the theme integrates cleanly with the site. */
   {pygments_css}
+
+  .highlight, .highlight pre {{ background: var(--code-bg) !important; }}
 </style>
 </head>
 <body>
@@ -408,7 +463,7 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: L
 
     <section>
         <div class="meta">
-        <div><strong>Repository:</strong> <a href="{html.escape(repo_url)}">{html.escape(repo_url)}</a></div>
+        <div><strong>Repository:</strong> <a href="{html.escape(repo_url)}" style="color: var(--accent)">{html.escape(repo_url)}</a></div>
         <small><strong>HEAD commit:</strong> {html.escape(head_commit)}</small>
         <div class="counts">
             <strong>Total files:</strong> {total_files} · <strong>Rendered:</strong> {len(rendered)} · <strong>Skipped:</strong> {len(skipped_binary) + len(skipped_large) + len(skipped_ignored)}
@@ -455,6 +510,7 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: L
 </div>
 
 <script>
+/* Small helpers to toggle between Human and LLM views */
 function showHumanView() {{
   document.getElementById('human-view').style.display = 'block';
   document.getElementById('llm-view').style.display = 'none';
