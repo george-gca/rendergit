@@ -4,6 +4,7 @@ Flatten a GitHub repo into a single static HTML page for fast skimming and Ctrl+
 """
 
 from __future__ import annotations
+
 import argparse
 import html
 import os
@@ -19,40 +20,78 @@ from dataclasses import dataclass
 from nbconvert import HTMLExporter
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
-from pygments.lexers import get_lexer_for_filename, TextLexer
+from pygments.lexers import TextLexer, get_lexer_for_filename
 from traitlets.config import Config
 
 try:
     import markdown  # Python-Markdown
 except ImportError:
-    print("Missing dependency: markdown. Install with `pip install markdown`.", file=sys.stderr)
+    print(
+        "Missing dependency: markdown. Install with `pip install markdown`.",
+        file=sys.stderr,
+    )
     raise
 
 MAX_DEFAULT_BYTES = 50 * 1024
 BINARY_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".ico",
-    ".pdf", ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar",
-    ".mp3", ".mp4", ".mov", ".avi", ".mkv", ".wav", ".ogg", ".flac",
-    ".ttf", ".otf", ".eot", ".woff", ".woff2",
-    ".so", ".dll", ".dylib", ".class", ".jar", ".exe", ".bin",
+    ".7z",
+    ".avi",
+    ".bin",
+    ".bmp",
+    ".bz2",
+    ".class",
+    ".dll",
+    ".dylib",
+    ".eot",
+    ".exe",
+    ".flac",
+    ".gif",
+    ".gz",
+    ".ico",
+    ".jar",
+    ".jpeg",
+    ".jpg",
+    ".mkv",
+    ".mov",
+    ".mp3",
+    ".mp4",
+    ".ogg",
+    ".otf",
+    ".pdf",
+    ".png",
+    ".rar",
+    ".so",
+    ".svg",
+    ".tar",
+    ".ttf",
+    ".wav",
+    ".webp",
+    ".woff",
+    ".woff2",
+    ".xz",
+    ".zip",
 }
 MARKDOWN_EXTENSIONS = {".md", ".markdown", ".mdown", ".mkd", ".mkdn"}
 NOTEBOOK_EXTENSIONS = {".ipynb"}
+
 
 @dataclass
 class RenderDecision:
     include: bool
     reason: str  # "ok" | "binary" | "too_large" | "ignored"
 
+
 @dataclass
 class FileInfo:
     path: pathlib.Path  # absolute path on disk
-    rel: str            # path relative to repo root (slash-separated)
+    rel: str  # path relative to repo root (slash-separated)
     size: int
     decision: RenderDecision
 
 
-def run(cmd: list[str], cwd: str | None = None, check: bool = True) -> subprocess.CompletedProcess:
+def run(
+    cmd: list[str], cwd: str | None = None, check: bool = True
+) -> subprocess.CompletedProcess:
     # Helper to run shell commands and capture output
     return subprocess.run(cmd, cwd=cwd, check=check, text=True, capture_output=True)
 
@@ -106,7 +145,9 @@ def looks_binary(path: pathlib.Path) -> bool:
         return True
 
 
-def decide_file(path: pathlib.Path, repo_root: pathlib.Path, max_bytes: int) -> FileInfo:
+def decide_file(
+    path: pathlib.Path, repo_root: pathlib.Path, max_bytes: int
+) -> FileInfo:
     # Decide whether to include a file, and record why if not
     rel = str(path.relative_to(repo_root)).replace(os.sep, "/")
     try:
@@ -123,7 +164,9 @@ def decide_file(path: pathlib.Path, repo_root: pathlib.Path, max_bytes: int) -> 
     return FileInfo(path, rel, size, RenderDecision(True, "ok"))
 
 
-def collect_files(repo_root: pathlib.Path, max_bytes: int, use_gitignore: bool = False) -> list[FileInfo]:
+def collect_files(
+    repo_root: pathlib.Path, max_bytes: int, use_gitignore: bool = False
+) -> list[FileInfo]:
     # Walk the repo and collect candidate files with decisions
     infos: list[FileInfo] = []
     spec = None
@@ -131,7 +174,10 @@ def collect_files(repo_root: pathlib.Path, max_bytes: int, use_gitignore: bool =
         try:
             import pathspec
         except ImportError:
-            print("ERROR: pathspec package is required for .gitignore support. Install with 'pip install pathspec'", file=sys.stderr)
+            print(
+                "ERROR: pathspec package is required for .gitignore support. Install with 'pip install pathspec'",
+                file=sys.stderr,
+            )
             sys.exit(1)
         gitignore_path = repo_root / ".gitignore"
         if gitignore_path.exists():
@@ -171,8 +217,14 @@ def generate_tree_fallback(root: pathlib.Path) -> str:
 def try_tree_command(root: pathlib.Path) -> str:
     # Use the real `tree` output if available; otherwise fall back to our Python version
     try:
-        cmd1 = subprocess.Popen(("git", "ls-files", "-c", "-o", "--exclude-standard"), stdout=subprocess.PIPE, cwd=str(root))
-        cmd2 = subprocess.check_output(("tree", "--fromfile"), stdin=cmd1.stdout, text=True)
+        cmd1 = subprocess.Popen(
+            ("git", "ls-files", "-c", "-o", "--exclude-standard"),
+            stdout=subprocess.PIPE,
+            cwd=str(root),
+        )
+        cmd2 = subprocess.check_output(
+            ("tree", "--fromfile"), stdin=cmd1.stdout, text=True
+        )
         cmd1.wait()
         return cmd2
     except Exception:
@@ -183,19 +235,22 @@ def read_text(path: pathlib.Path) -> str:
     # Read text safely with UTF-8 and replacement for weird bytes
     return path.read_text(encoding="utf-8", errors="replace")
 
+
 def render_notebook_html(nb_path: pathlib.Path) -> str:
     """Convert a Jupyter notebook to HTML using nbconvert."""
     try:
         # Create a Config object to set exporter options
         c = Config()
-        c.HTMLExporter.theme = 'dark'
+        c.HTMLExporter.theme = "dark"
         exporter = HTMLExporter(config=c)
         exporter.exclude_input_prompt = True
         exporter.exclude_output_prompt = True
         body, _ = exporter.from_filename(str(nb_path))
         return body
     except Exception as e:
-        return f"<pre class='error'>Failed to render notebook: {html.escape(str(e))}</pre>"
+        return (
+            f"<pre class='error'>Failed to render notebook: {html.escape(str(e))}</pre>"
+        )
 
 
 def render_markdown_text(md_text: str) -> str:
@@ -246,17 +301,21 @@ def generate_cxml_text(infos: list[FileInfo], repo_dir: pathlib.Path) -> str:
     return "\n".join(lines)
 
 
-def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: list[FileInfo]) -> str:
+def build_html(
+    repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: list[FileInfo]
+) -> str:
     # Use a dark Pygments theme to match the page (monokai is widely available)
     formatter = HtmlFormatter(nowrap=False, style="monokai")  # <-- dark theme for code
-    pygments_css = formatter.get_style_defs('.highlight')
+    pygments_css = formatter.get_style_defs(".highlight")
 
     # Stats for the header
     rendered = [i for i in infos if i.decision.include]
     skipped_binary = [i for i in infos if i.decision.reason == "binary"]
     skipped_large = [i for i in infos if i.decision.reason == "too_large"]
     skipped_ignored = [i for i in infos if i.decision.reason == "ignored"]
-    total_files = len(rendered) + len(skipped_binary) + len(skipped_large) + len(skipped_ignored)
+    total_files = (
+        len(rendered) + len(skipped_binary) + len(skipped_large) + len(skipped_ignored)
+    )
 
     # Directory tree
     tree_text = try_tree_command(repo_dir)
@@ -291,8 +350,12 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: l
                     code_html = highlight_code(text, i.rel, formatter)
                     body_html = f'<div class="highlight">{code_html}</div>'
         except Exception as e:
-            body_html = f'<pre class="error">Failed to render: {html.escape(str(e))}</pre>'
-        sections.append(f'<section class="file-section" id="file-{anchor}">\n  <h2>{html.escape(i.rel)} <span class="muted">({bytes_human(i.size)})</span></h2>\n  <div class="file-body">{body_html}</div>\n  <div class="back-top"><a href="#top">↑ Back to top</a></div>\n</section>\n')
+            body_html = (
+                f'<pre class="error">Failed to render: {html.escape(str(e))}</pre>'
+            )
+        sections.append(
+            f'<section class="file-section" id="file-{anchor}">\n  <h2>{html.escape(i.rel)} <span class="muted">({bytes_human(i.size)})</span></h2>\n  <div class="file-body">{body_html}</div>\n  <div class="back-top"><a href="#top">↑ Back to top</a></div>\n</section>\n'
+        )
 
     # Skips lists
     def render_skip_list(title: str, items: list[FileInfo]) -> str:
@@ -308,10 +371,9 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: l
             f"<ul class='skip-list'>\n" + "\n".join(lis) + "\n</ul></details>"
         )
 
-    skipped_html = (
-        render_skip_list("Skipped binaries", skipped_binary) +
-        render_skip_list("Skipped large files", skipped_large)
-    )
+    skipped_html = render_skip_list(
+        "Skipped binaries", skipped_binary
+    ) + render_skip_list("Skipped large files", skipped_large)
 
     # HTML with left sidebar TOC
     return f"""
@@ -322,7 +384,7 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: l
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <!-- Tell browsers our UI is dark so scrollbars/inputs match -->
 <meta name="color-scheme" content="dark" />
-<title>Flattened repo – {html.escape(repo_url)}</title>
+<title>Flattened repo - {html.escape(repo_url)}</title>
 <style>
   /* =======================
      Dark Theme Tokens
@@ -493,7 +555,7 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: l
         {skipped_html}
       </section>
 
-      {''.join(sections)}
+      {"".join(sections)}
     </div>
 
     <div id="llm-view">
@@ -540,10 +602,10 @@ function showLLMView() {{
 def derive_temp_output_path(repo_url: str) -> pathlib.Path:
     """Derive a temporary output path from the repo URL."""
     # Extract repo name from URL like https://github.com/owner/repo or https://github.com/owner/repo.git
-    parts = repo_url.rstrip('/').split('/')
+    parts = repo_url.rstrip("/").split("/")
     if len(parts) >= 2:
         repo_name = parts[-1]
-        if repo_name.endswith('.git'):
+        if repo_name.endswith(".git"):
             repo_name = repo_name[:-4]
         filename = f"{repo_name}.html"
     else:
@@ -553,11 +615,29 @@ def derive_temp_output_path(repo_url: str) -> pathlib.Path:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Flatten a GitHub or local repo to a single HTML page")
-    ap.add_argument("repo_path_or_url", help="GitHub repo URL (https://github.com/owner/repo[.git]) or local path")
-    ap.add_argument("-o", "--out", help="Output HTML file path (default: temporary file derived from repo name)")
-    ap.add_argument("--max-bytes", type=int, default=MAX_DEFAULT_BYTES, help="Max file size to render (bytes); larger files are listed but skipped")
-    ap.add_argument("--no-open", action="store_true", help="Don't open the HTML file in browser after generation")
+    ap = argparse.ArgumentParser(
+        description="Flatten a GitHub or local repo to a single HTML page"
+    )
+    ap.add_argument(
+        "repo_path_or_url",
+        help="GitHub repo URL (https://github.com/owner/repo[.git]) or local path",
+    )
+    ap.add_argument(
+        "-o",
+        "--out",
+        help="Output HTML file path (default: temporary file derived from repo name)",
+    )
+    ap.add_argument(
+        "--max-bytes",
+        type=int,
+        default=MAX_DEFAULT_BYTES,
+        help="Max file size to render (bytes); larger files are listed but skipped",
+    )
+    ap.add_argument(
+        "--no-open",
+        action="store_true",
+        help="Don't open the HTML file in browser after generation",
+    )
     args = ap.parse_args()
 
     # Determine if input is a local path or remote URL
@@ -577,7 +657,10 @@ def main() -> int:
         tmpdir = tempfile.mkdtemp(prefix="flatten_repo_")
         repo_dir = pathlib.Path(tmpdir, "repo")
         repo_url = input_path
-        print(f"📁 Cloning {input_path} to temporary directory: {repo_dir}", file=sys.stderr)
+        print(
+            f"📁 Cloning {input_path} to temporary directory: {repo_dir}",
+            file=sys.stderr,
+        )
         git_clone(input_path, str(repo_dir))
         head = git_head_commit(str(repo_dir))
         print(f"✓ Clone complete (HEAD: {head[:8]})", file=sys.stderr)
@@ -586,7 +669,10 @@ def main() -> int:
     infos = collect_files(repo_dir, args.max_bytes, use_gitignore=is_local)
     rendered_count = sum(1 for i in infos if i.decision.include)
     skipped_count = len(infos) - rendered_count
-    print(f"✓ Found {len(infos)} files total ({rendered_count} will be rendered, {skipped_count} skipped)", file=sys.stderr)
+    print(
+        f"✓ Found {len(infos)} files total ({rendered_count} will be rendered, {skipped_count} skipped)",
+        file=sys.stderr,
+    )
 
     print("🔨 Generating HTML...", file=sys.stderr)
     html_out = build_html(str(repo_url), repo_dir, head, infos)
