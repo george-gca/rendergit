@@ -14,7 +14,6 @@ import sys
 import tempfile
 import webbrowser
 from dataclasses import dataclass
-from typing import List
 
 # External deps
 from nbconvert import HTMLExporter
@@ -25,7 +24,7 @@ from traitlets.config import Config
 
 try:
     import markdown  # Python-Markdown
-except ImportError as e:
+except ImportError:
     print("Missing dependency: markdown. Install with `pip install markdown`.", file=sys.stderr)
     raise
 
@@ -53,7 +52,7 @@ class FileInfo:
     decision: RenderDecision
 
 
-def run(cmd: List[str], cwd: str | None = None, check: bool = True) -> subprocess.CompletedProcess:
+def run(cmd: list[str], cwd: str | None = None, check: bool = True) -> subprocess.CompletedProcess:
     # Helper to run shell commands and capture output
     return subprocess.run(cmd, cwd=cwd, check=check, text=True, capture_output=True)
 
@@ -124,9 +123,9 @@ def decide_file(path: pathlib.Path, repo_root: pathlib.Path, max_bytes: int) -> 
     return FileInfo(path, rel, size, RenderDecision(True, "ok"))
 
 
-def collect_files(repo_root: pathlib.Path, max_bytes: int, use_gitignore: bool = False) -> List[FileInfo]:
+def collect_files(repo_root: pathlib.Path, max_bytes: int, use_gitignore: bool = False) -> list[FileInfo]:
     # Walk the repo and collect candidate files with decisions
-    infos: List[FileInfo] = []
+    infos: list[FileInfo] = []
     spec = None
     if use_gitignore:
         try:
@@ -151,8 +150,7 @@ def collect_files(repo_root: pathlib.Path, max_bytes: int, use_gitignore: bool =
 
 def generate_tree_fallback(root: pathlib.Path) -> str:
     """Minimal tree-like output if `tree` command is missing."""
-    lines: List[str] = []
-    prefix_stack: List[str] = []
+    lines: list[str] = []
 
     def walk(dir_path: pathlib.Path, prefix: str = ""):
         entries = [e for e in dir_path.iterdir() if e.name != ".git"]
@@ -173,8 +171,10 @@ def generate_tree_fallback(root: pathlib.Path) -> str:
 def try_tree_command(root: pathlib.Path) -> str:
     # Use the real `tree` output if available; otherwise fall back to our Python version
     try:
-        cp = run(["tree", "-a", "."], cwd=str(root))
-        return cp.stdout
+        cmd1 = subprocess.Popen(("git", "ls-files", "-c", "-o", "--exclude-standard"), stdout=subprocess.PIPE, cwd=str(root))
+        cmd2 = subprocess.check_output(("tree", "--fromfile"), stdin=cmd1.stdout, text=True)
+        cmd1.wait()
+        return cmd2
     except Exception:
         return generate_tree_fallback(root)
 
@@ -223,7 +223,7 @@ def slugify(path_str: str) -> str:
     return "".join(out)
 
 
-def generate_cxml_text(infos: List[FileInfo], repo_dir: pathlib.Path) -> str:
+def generate_cxml_text(infos: list[FileInfo], repo_dir: pathlib.Path) -> str:
     """Generate CXML format text for LLM consumption."""
     lines = ["<documents>"]
 
@@ -246,7 +246,7 @@ def generate_cxml_text(infos: List[FileInfo], repo_dir: pathlib.Path) -> str:
     return "\n".join(lines)
 
 
-def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: List[FileInfo]) -> str:
+def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: list[FileInfo]) -> str:
     # Use a dark Pygments theme to match the page (monokai is widely available)
     formatter = HtmlFormatter(nowrap=False, style="monokai")  # <-- dark theme for code
     pygments_css = formatter.get_style_defs('.highlight')
@@ -265,7 +265,7 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: L
     cxml_text = generate_cxml_text(infos, repo_dir)
 
     # Table of contents
-    toc_items: List[str] = []
+    toc_items: list[str] = []
     for i in rendered:
         anchor = slugify(i.rel)
         toc_items.append(
@@ -275,7 +275,7 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: L
     toc_html = "".join(toc_items)
 
     # Render file sections
-    sections: List[str] = []
+    sections: list[str] = []
     for i in rendered:
         anchor = slugify(i.rel)
         p = i.path
@@ -295,7 +295,7 @@ def build_html(repo_url: str, repo_dir: pathlib.Path, head_commit: str, infos: L
         sections.append(f'<section class="file-section" id="file-{anchor}">\n  <h2>{html.escape(i.rel)} <span class="muted">({bytes_human(i.size)})</span></h2>\n  <div class="file-body">{body_html}</div>\n  <div class="back-top"><a href="#top">↑ Back to top</a></div>\n</section>\n')
 
     # Skips lists
-    def render_skip_list(title: str, items: List[FileInfo]) -> str:
+    def render_skip_list(title: str, items: list[FileInfo]) -> str:
         if not items:
             return ""
         lis = [
