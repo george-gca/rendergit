@@ -1003,6 +1003,11 @@ def build_html(
     --radius-md: 12px;
     --radius-lg: 16px;
     --radius-xl: 20px;
+
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --danger-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
   }}
 
   * {{
@@ -2066,6 +2071,17 @@ def build_html(
     border-radius: var(--radius-sm);
     padding: 0.5rem 1rem;
     margin-bottom: 0.5rem;
+  }}
+
+  .file-section {{
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+    will-change: opacity, transform;
+  }}
+  .file-section.visible {{
+    opacity: 1;
+    transform: translateY(0);
   }}
 </style>
 </head>
